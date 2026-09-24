@@ -48,6 +48,27 @@ These exist because networking and testability depend on them. Breaking them is 
 8. **Monsters and riders never share a stat axis.** Monster = HP, speed, accel, handling, weight. Rider = power, focus, luck, guard, precision. A rider must never affect how a monster drives. `tests/test_loadout.py` enforces this plus the 250-point rider budget — if that test fails, someone made a rider a straight upgrade rather than a sidegrade.
 9. **The host is authoritative** for damage, HP, KO, kill credit, item rolls, rider actives, checkpoints, and race start/end. Clients predict their own kart only.
 
+## Workflow: one branch per feature
+
+Every new feature or change follows this flow:
+
+1. The owner requests the work.
+2. **Before writing any code, create a new branch off an up-to-date `main`** (e.g. `feature/<short-description>`).
+3. Write the code on that branch and leave it **uncommitted**.
+4. The owner reviews the uncommitted changes in their IDE.
+5. The owner commits and merges into `main` if it looks good.
+
+**Never commit, push, merge, or open PRs** — review happens pre-commit in the IDE, and committing is the owner's call.
+
+## Code style: object-oriented
+
+The owner prefers OOP. Write new code that way:
+
+- **Put behaviour and the state it works on in classes.** For example, `Game` owns the loop and `Screen` owns the window and buffer. Avoid loose module-level functions that pass state around.
+- **Use small, focused classes and composition, not deep inheritance.** Use `@dataclass(frozen=True)` for value objects such as stat blocks, snapshots, and `InputFrame`, and ordinary classes for things with behaviour.
+- **Put pure calculations in methods on the relevant class** (a `classmethod`/`staticmethod` is fine), so they stay testable without a window (see `Viewport.fit`).
+- **OOP never overrides the architectural rules below.** Sim objects stay pure and deterministic, and keep the public names the GDD specifies (`Simulation.step`, `resolve_loadout`, …).
+
 ## Visual constraints
 
 **This is a modern game that looks like an old one.** The pixel aesthetic comes from a small render buffer; everything around it is contemporary.
@@ -63,4 +84,4 @@ Riders are **composited over monsters at runtime** using per-monster mount point
 
 ## Current status
 
-Pre-production. No code yet. Next step is **M0 — Mode 7 Spike** (GDD §17): prove Mode 7 rendering at 320×180 holds 144 fps in pygame-ce, verify integer scaling to 1080p/4K, and decide numpy vs moderngl. Nothing else should be built until that exit criterion is met.
+Pre-production. The only code so far is an entrypoint (`python -m smk`) that opens a window and presents a blank 320×180 buffer, integer-scaled and letterboxed. There is no sim, fixed-tick loop or vsync yet. Setup: `py -3.12 -m venv .venv` then `.venv/Scripts/python -m pip install -e ".[dev]"`. Next step is **M0 — Mode 7 Spike** (GDD §17): prove Mode 7 rendering at 320×180 holds 144 fps in pygame-ce, verify integer scaling to 1080p/4K, and decide numpy vs moderngl. Nothing else should be built until that exit criterion is met.

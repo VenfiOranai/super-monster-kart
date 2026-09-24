@@ -66,7 +66,7 @@ The owner prefers OOP. Write new code that way:
 
 - **Put behaviour and the state it works on in classes.** For example, `Game` owns the loop and `Screen` owns the window and buffer. Avoid loose module-level functions that pass state around.
 - **Use small, focused classes and composition, not deep inheritance.** Use `@dataclass(frozen=True)` for value objects such as stat blocks, snapshots, and `InputFrame`, and ordinary classes for things with behaviour.
-- **Put pure calculations in methods on the relevant class** (a `classmethod`/`staticmethod` is fine), so they stay testable without a window (see `Letterbox.fit`).
+- **Put pure calculations in methods on the relevant class** (a `classmethod`/`staticmethod` is fine), so they stay testable without a window (see `Viewport.fit`).
 - **OOP never overrides the architectural rules below.** Sim objects stay pure and deterministic, and keep the public names the GDD specifies (`Simulation.step`, `resolve_loadout`, …).
 
 ## Visual constraints

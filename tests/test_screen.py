@@ -31,3 +31,16 @@ def test_ultrawide_gets_pillarbox_not_wider_view():
     assert viewport.scale == 8
     assert viewport.size == (2560, 1440)
     assert viewport.offset == (440, 0)
+
+
+@pytest.mark.parametrize(
+    ("desktop", "window"),
+    [
+        ((1920, 1080), (1280, 720)),
+        ((2560, 1440), (1920, 1080)),
+        ((3840, 2160), (2880, 1620)),
+        ((1366, 768), (960, 540)),
+    ],
+)
+def test_default_window_is_an_exact_scale_with_room_to_spare(desktop, window):
+    assert Screen.default_window_size(desktop) == window

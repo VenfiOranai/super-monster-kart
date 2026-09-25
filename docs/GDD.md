@@ -919,7 +919,7 @@ For row y:
   scale         = distance / focal
   world_start   = cam_pos + rotate(forward * distance - right * (screen_w/2) * scale, cam_angle)
   world_step    = rotate(right * scale, cam_angle)
-  # sample track_texture along world_start + x * world_step for x in 0..255
+  # sample track_texture along world_start + x * world_step for x in 0..screen_w-1 (0..319)
 ```
 
 **Implementation:** build the full 320×(180−horizon) sample coordinate array with numpy broadcasting, then index the 1024×1024 track texture in one vectorised gather. Do **not** write a per-pixel Python loop — it will not hit 60 fps.

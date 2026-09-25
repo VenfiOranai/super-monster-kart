@@ -22,3 +22,5 @@ include = ["smk*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Lets tests import the dev tooling in tools/, which is not an installed package.
+pythonpath = ["."]

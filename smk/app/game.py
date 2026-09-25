@@ -4,7 +4,7 @@ from smk.render.screen import Screen
 
 
 class Game:
-    """Owns the pygame lifetime and the main loop.
+    """Owns the main loop, and shuts pygame down when it ends.
 
     For now the loop only pumps events and renders a blank frame. The fixed
     60 Hz sim tick with interpolated rendering (GDD §14.3) slots in here once
@@ -14,7 +14,6 @@ class Game:
     TITLE = "Super Monster Kart"
 
     def __init__(self) -> None:
-        pygame.init()
         self._screen = Screen(self.TITLE)
         self._running = False
 

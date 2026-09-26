@@ -924,6 +924,8 @@ For row y:
 
 **Implementation:** build the full 320×(180−horizon) sample coordinate array with numpy broadcasting, then index the 1024×1024 track texture in one vectorised gather. Do **not** write a per-pixel Python loop — it will not hit 60 fps.
 
+**Distance filtering.** A row far from the camera covers many texels of depth, so one nearest-neighbour sample per pixel makes thin features across the direction of travel (lane lines, track edges) pop in and out as the camera moves forward. Each row instead takes up to 4 evenly spaced samples across the depth it covers, from a box-filtered mip level chosen so neighbouring samples are at most one texel apart, and averages them. Rows covering at most 2 texels of depth (*TUNING*, `SHARP_SPAN`) keep a single nearest-neighbour sample: a feature at least that deep can't fall between samples, and it keeps the near ground crisp. This is the one exception to the nearest-neighbour rule (§16.1). The per-row sampling plan depends only on camera height, horizon and FOV, so it is computed once and reused.
+
 The M0 spike (§17) determines whether the numpy gather is fast enough at 320×~110 px (roughly 35k samples/frame — it should be, and note this must hold at the *render* rate, so budget against 144 Hz rather than 60) or whether the transform moves to a moderngl fragment shader.
 
 Ground-level decals (traps, lingering zones, animated boost pads) are blitted into a **copy of the track texture region** before sampling, so they warp with the plane. Keep a dirty-rect list to avoid recopying 1 MB per frame.
@@ -1107,7 +1109,7 @@ Sourcing is deliberately undecided (§18). This section specifies what must be t
 | Palette | Max 256 colours globally; per-sprite max 16 including transparency |
 | Colour depth feel | SNES-adjacent. No gradients, no anti-aliasing, no soft alpha. |
 | Alpha | 1-bit (on/off) only. No partial transparency in sprites. |
-| Filtering | Nearest-neighbour everywhere, always |
+| Filtering | Nearest-neighbour everywhere, always — with one exception: distant rows of the Mode 7 plane are averaged across the depth they cover (§14.4), so the far ground can show blended colours outside the palette. Near rows stay nearest-neighbour. |
 
 ### 16.2 Racers: layered monster + rider
 

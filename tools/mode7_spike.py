@@ -27,7 +27,7 @@ import time
 
 import pygame
 
-from smk import reporting
+from smk import consts, reporting
 from smk.app.bootstrap import setup
 from smk.render.mode7 import Mode7Camera, Mode7Plane, Mode7Renderer
 from smk.render.screen import Screen, Viewport
@@ -48,7 +48,7 @@ class Mode7Spike:
     CLIMB_SPEED = 60.0
     HORIZON_SPEED = 40.0  # rows per second
     MIN_HEIGHT, MAX_HEIGHT = 2.0, 400.0
-    MIN_HORIZON, MAX_HORIZON = 0, Screen.INTERNAL_SIZE[1] - 10
+    MIN_HORIZON, MAX_HORIZON = 0, consts.INTERNAL_SIZE[1] - 10
 
     WINDOW_PRESETS = {
         pygame.K_1: (1280, 720),
@@ -63,9 +63,9 @@ class Mode7Spike:
         reporting.install(self._performance)
         self._screen = Screen(self.TITLE, vsync=vsync)
         self._vsync = vsync
-        self._renderer = Mode7Renderer(Mode7Plane(CalibrationTexture.generate()), Screen.INTERNAL_SIZE)
+        self._renderer = Mode7Renderer(Mode7Plane(CalibrationTexture.generate()), consts.INTERNAL_SIZE)
         self._filtered = True
-        self._sharp_span = Mode7Renderer.SHARP_SPAN
+        self._sharp_span = consts.SHARP_SPAN
         self._camera = Mode7Camera(x=512.0, y=900.0, angle=-math.pi / 2)
         self._horizon = float(self._camera.horizon_y)
         self._orbiting = False
@@ -163,7 +163,7 @@ class Mode7Spike:
             return
         fps = performance.frame_count / (sum(performance.samples("frame")) / 1000)
         window_size = self._screen.window.size
-        scale = Viewport.fit(Screen.INTERNAL_SIZE, window_size).scale
+        scale = Viewport.fit(consts.INTERNAL_SIZE, window_size).scale
         work = self._work()
         verdict = "OK" if work.p99_ms <= self.BUDGET_MS else "OVER"
         stages = " | ".join(f"{name} {s.mean_ms:.2f}" for name, s in stats.items() if name != "frame")

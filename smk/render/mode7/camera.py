@@ -1,6 +1,8 @@
 import math
 from dataclasses import dataclass
 
+from smk import consts
+
 
 @dataclass(frozen=True)
 class Mode7Camera:
@@ -9,9 +11,9 @@ class Mode7Camera:
     x: float
     y: float
     angle: float
-    height: float = 48.0  # CAM_HEIGHT, GDD §12.3
-    horizon_y: int = 70
-    fov_degrees: float = 68.0  # GDD §12.3
+    height: float = consts.CAMERA_HEIGHT
+    horizon_y: int = consts.HORIZON_Y
+    fov_degrees: float = consts.FOV_DEGREES
 
     def focal_length(self, screen_width: int) -> float:
         """Derived from the authored FOV, never the reverse (GDD §12.3)."""

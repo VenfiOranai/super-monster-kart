@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from smk import consts
 from smk.render.mode7.camera import Mode7Camera
 from smk.render.mode7.plane import Mode7Plane
 
@@ -23,7 +24,7 @@ class RowPlan:
     off. The plan depends only on the camera's height, horizon and FOV.
     """
 
-    MAX_SAMPLES = Mode7Plane.MAX_SUMMED
+    MAX_SAMPLES = consts.MAX_DISTANCE_SAMPLES
 
     distances: np.ndarray  # (samples,) camera distance of each sample
     levels: np.ndarray  # (samples,) mip level of each sample
@@ -71,13 +72,13 @@ class Mode7Renderer:
     every pixel a single nearest-neighbour sample.
     """
 
-    SHARP_SPAN = 2.0  # texels of depth a row can cover before it is filtered
-
     def __init__(self, plane: Mode7Plane, screen_size: tuple[int, int]) -> None:
+        if not 1 <= RowPlan.MAX_SAMPLES <= Mode7Plane.MAX_SUMMED:
+            raise ValueError(f"MAX_DISTANCE_SAMPLES must be 1 to {Mode7Plane.MAX_SUMMED}, got {RowPlan.MAX_SAMPLES}")
         self._plane = plane
         self._size = screen_size
         self._width, self._height = screen_size
-        self.sharp_span = self.SHARP_SPAN
+        self.sharp_span = consts.SHARP_SPAN
         # Pixel-centre offset of each column from the screen centre, as a row vector.
         self._columns = (np.arange(self._width, dtype=np.float32) + 0.5 - self._width / 2)[None, :]
         self._plan_key: tuple | None = None

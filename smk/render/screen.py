@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pygame
 from pygame._sdl2.video import Renderer, Texture
 
-from smk import reporting
+from smk import consts, reporting
 
 
 @dataclass(frozen=True)
@@ -42,27 +42,23 @@ class Screen:
     (8.3M at 4K), which blew the frame budget from 1440p up in the M0 spike.
     """
 
-    INTERNAL_SIZE = (320, 180)
-    DEFAULT_DESKTOP_FRACTION = 0.75
-    BAR_COLOUR = (0, 0, 0)
-
     @classmethod
     def default_window_size(cls, desktop_size: tuple[int, int]) -> tuple[int, int]:
         """The largest exact integer scale that leaves room around the window on this desktop."""
-        room = tuple(int(side * cls.DEFAULT_DESKTOP_FRACTION) for side in desktop_size)
-        return Viewport.fit(cls.INTERNAL_SIZE, room).size
+        room = tuple(int(side * consts.DEFAULT_DESKTOP_FRACTION) for side in desktop_size)
+        return Viewport.fit(consts.INTERNAL_SIZE, room).size
 
-    def __init__(self, title: str, vsync: bool = True) -> None:
+    def __init__(self, title: str, vsync: bool = consts.VSYNC) -> None:
         """Needs pygame initialised; see ``smk.app.bootstrap.setup``."""
         desktop = pygame.display.get_desktop_sizes()[0]
         self._window = pygame.Window(title, size=self.default_window_size(desktop), resizable=True)
-        self._window.minimum_size = self.INTERNAL_SIZE
+        self._window.minimum_size = consts.INTERNAL_SIZE
         # 32-bit so renderers can write packed pixels through surfarray.pixels2d.
-        self._buffer = pygame.Surface(self.INTERNAL_SIZE, depth=32)
+        self._buffer = pygame.Surface(consts.INTERNAL_SIZE, depth=32)
         self._renderer = Renderer(self._window, vsync=vsync)
-        self._renderer.draw_color = self.BAR_COLOUR
+        self._renderer.draw_color = consts.LETTERBOX_COLOUR
         # scale_quality 0 is nearest-neighbour sampling — never filter the pixel grid.
-        self._texture = Texture(self._renderer, self.INTERNAL_SIZE, streaming=True, scale_quality=0)
+        self._texture = Texture(self._renderer, consts.INTERNAL_SIZE, streaming=True, scale_quality=0)
 
     @property
     def buffer(self) -> pygame.Surface:
@@ -79,7 +75,7 @@ class Screen:
         with reporting.reporter.measure("scale"):
             # Clearing every frame paints the bars; the back buffer is undefined after a present.
             self._renderer.clear()
-            viewport = Viewport.fit(self.INTERNAL_SIZE, self._renderer.get_viewport().size)
+            viewport = Viewport.fit(consts.INTERNAL_SIZE, self._renderer.get_viewport().size)
             self._texture.draw(dstrect=viewport.rect)
         with reporting.reporter.measure("flip"):
             self._renderer.present()

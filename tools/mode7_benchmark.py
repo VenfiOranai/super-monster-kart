@@ -14,7 +14,7 @@ import sys
 
 import pygame
 
-from smk import reporting
+from smk import consts, reporting
 from smk.app.bootstrap import setup
 from smk.render.mode7 import Mode7Camera, Mode7Plane, Mode7Renderer
 from smk.render.screen import Screen
@@ -43,7 +43,7 @@ class Mode7Benchmark:
             performance = PerformanceReporter()
             reporting.install(performance)
             screen = Screen("mode7 benchmark", vsync=False)
-            renderer = Mode7Renderer(Mode7Plane(CalibrationTexture.generate()), Screen.INTERNAL_SIZE)
+            renderer = Mode7Renderer(Mode7Plane(CalibrationTexture.generate()), consts.INTERNAL_SIZE)
             print(f"Video driver: {pygame.display.get_driver()}")
             print(f"Budget: {self._budget_ms:.2f} ms/frame "
                   f"({self.TARGET_FPS} fps with {self.REQUIRED_SPARE:.0%} spare), "

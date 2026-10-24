@@ -934,6 +934,7 @@ Ground-level decals (traps, lingering zones, animated boost pads) are blitted in
 
 ```
 smk/
+  consts.py       # hand-tunable presentation knobs (display, camera, filtering). Not importable by sim.
   sim/            # PURE. No pygame, no I/O, no clock.
     simulation.py   # Simulation, tick order
     loadout.py      # resolve_loadout(monster, rider) -> RacerStats (§7.7)

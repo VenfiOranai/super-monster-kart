@@ -1,8 +1,9 @@
 """The Mode 7 ground plane: a per-row affine texture lookup (GDD §14.4).
 
-Pure numpy. Pixels are packed 32-bit values in the target surface's format,
-indexed ``[x, y]`` like ``pygame.surfarray`` so the result can be written
-straight into ``pixels2d`` with no transpose.
+Pure numpy. Textures and output are RGB indexed ``[x, y, channel]`` like
+``pygame.surfarray``, so the result can be written straight into
+``pixels3d`` with no transpose. Distant rows are filtered across the depth
+they cover so they don't shimmer when the camera moves forward (``RowPlan``).
 
 Coordinates are texture space: x right, y down, in texels. ``angle`` 0 faces
 +x; positive angles turn clockwise on screen (towards +y).

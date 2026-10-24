@@ -871,7 +871,7 @@ Written for implementers. These rules are structural — violating them makes ne
 - **Python 3.11**
 - **pygame-ce** (Community Edition) for windowing, input, blitting, audio
 - **numpy** for the Mode 7 transform and any per-pixel work
-- Possibly **moderngl** for GPU-assisted Mode 7 — decided by the M0 spike (§17)
+- ~~Possibly **moderngl** for GPU-assisted Mode 7~~ — the M0 spike chose numpy; moderngl is the fallback only (§18 #3)
 - `pytest` for tests
 
 ### 14.2 The core rule: pure simulation
@@ -924,7 +924,9 @@ For row y:
 
 **Implementation:** build the full 320×(180−horizon) sample coordinate array with numpy broadcasting, then index the 1024×1024 track texture in one vectorised gather. Do **not** write a per-pixel Python loop — it will not hit 60 fps.
 
-The M0 spike (§17) determines whether the numpy gather is fast enough at 320×~110 px (roughly 35k samples/frame — it should be, and note this must hold at the *render* rate, so budget against 144 Hz rather than 60) or whether the transform moves to a moderngl fragment shader.
+**Distance filtering.** A row far from the camera covers many texels of depth, so one nearest-neighbour sample per pixel makes thin features across the direction of travel (lane lines, track edges) pop in and out as the camera moves forward. Each row instead takes up to 4 evenly spaced samples across the depth it covers, from a box-filtered mip level chosen so neighbouring samples are at most one texel apart, and averages them. Rows covering at most 2 texels of depth (*TUNING*, `SHARP_SPAN` in `smk/consts.py`) keep a single nearest-neighbour sample: a feature at least that deep can't fall between samples, and it keeps the near ground crisp. This is the one exception to the nearest-neighbour rule (§16.1). The per-row sampling plan depends only on camera height, horizon and FOV, so it is computed once and reused.
+
+The M0 spike (§17) checked whether the numpy gather is fast enough at 320×~110 px (roughly 35k samples/frame), budgeted against the *render* rate (144 Hz), not 60. It is: see §18 #3 for the numbers. A moderngl fragment shader stays the fallback if the frame budget gets tight later.
 
 Ground-level decals (traps, lingering zones, animated boost pads) are blitted into a **copy of the track texture region** before sampling, so they warp with the plane. Keep a dirty-rect list to avoid recopying 1 MB per frame.
 
@@ -932,6 +934,7 @@ Ground-level decals (traps, lingering zones, animated boost pads) are blitted in
 
 ```
 smk/
+  consts.py       # hand-tunable presentation knobs (display, camera, filtering). Not importable by sim.
   sim/            # PURE. No pygame, no I/O, no clock.
     simulation.py   # Simulation, tick order
     loadout.py      # resolve_loadout(monster, rider) -> RacerStats (§7.7)
@@ -1107,7 +1110,7 @@ Sourcing is deliberately undecided (§18). This section specifies what must be t
 | Palette | Max 256 colours globally; per-sprite max 16 including transparency |
 | Colour depth feel | SNES-adjacent. No gradients, no anti-aliasing, no soft alpha. |
 | Alpha | 1-bit (on/off) only. No partial transparency in sprites. |
-| Filtering | Nearest-neighbour everywhere, always |
+| Filtering | Nearest-neighbour everywhere, always — with one exception: distant rows of the Mode 7 plane are averaged across the depth they cover (§14.4), so the far ground can show blended colours outside the palette. Near rows stay nearest-neighbour. |
 
 ### 16.2 Racers: layered monster + rider
 
@@ -1336,7 +1339,7 @@ Tracked honestly so they don't ossify into unexamined defaults.
 |---|---|---|---|
 | 1 | **Art sourcing** — hand-authored, generated, or asset packs? | M9 | The §16 spec is written to be sourcing-agnostic. Decide before M9, not before M4 (placeholders cover MVP). |
 | 2 | **Audio sourcing** — same question. | M9 | Same reasoning. |
-| 3 | **Mode 7: numpy or moderngl?** | M0 exit | The M0 spike answers this. Record the answer here. |
+| 3 | ~~**Mode 7: numpy or moderngl?**~~ **Resolved: numpy.** | M0 exit | Decided by the M0 spike (2026-09-26). With distance filtering on (§14.4), whole-frame p99 is ≈ 2.3–3.1 ms against the 4.17 ms 144 fps budget — at least 40% spare — at 720p, 1080p, 1440p, 4K and a 1000×700 window; Mode 7 itself is ≈ 1.6–1.7 ms of that. Scaling is done on the GPU (SDL renderer, nearest-neighbour), not the CPU. moderngl stays the fallback if sprites and HUD eat the margin; re-run `tools.mode7_benchmark` as they land. |
 | 4 | **TTK tuning** — is one lap right? | M4 balance pass | The single highest-risk design number in the document (§5.1). Only playtesting answers it. |
 | 5 | **Does the 250-point rider budget actually produce sidegrades?** | M4 | It guarantees equal *totals*, not equal *value*. If guard is worth twice what luck is, the high-guard rider dominates regardless of arithmetic. Watch pick rates; the fix is weighting the axes, not raising a rider's total. |
 | 6 | **Is 320×180 tall enough?** | M1 | 180 rows is the cost of exact integer scaling to every common display, and it is the tightest constraint in the presentation layer. If the Mode 7 view plus HUD proves cramped once M1 is drivable, the fallback is 384×216 — which keeps 16:9 and exact 1080p/4K scaling but loses exact 720p and 1440p. Decide from a real driving build, not from the spec. |

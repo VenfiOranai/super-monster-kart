@@ -1,5 +1,6 @@
 import pytest
 
+from smk import consts
 from smk.render.screen import Screen, Viewport
 
 
@@ -13,21 +14,21 @@ from smk.render.screen import Screen, Viewport
     ],
 )
 def test_common_displays_scale_exactly(window, scale):
-    viewport = Viewport.fit(Screen.INTERNAL_SIZE, window)
+    viewport = Viewport.fit(consts.INTERNAL_SIZE, window)
     assert viewport.scale == scale
     assert viewport.size == window
     assert viewport.offset == (0, 0)
 
 
 def test_awkward_window_uses_integer_scale_and_centres():
-    viewport = Viewport.fit(Screen.INTERNAL_SIZE, (1000, 700))
+    viewport = Viewport.fit(consts.INTERNAL_SIZE, (1000, 700))
     assert viewport.scale == 3
     assert viewport.size == (960, 540)
     assert viewport.offset == (20, 80)
 
 
 def test_ultrawide_gets_pillarbox_not_wider_view():
-    viewport = Viewport.fit(Screen.INTERNAL_SIZE, (3440, 1440))
+    viewport = Viewport.fit(consts.INTERNAL_SIZE, (3440, 1440))
     assert viewport.scale == 8
     assert viewport.size == (2560, 1440)
     assert viewport.offset == (440, 0)

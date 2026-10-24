@@ -41,7 +41,7 @@ These exist because networking and testability depend on them. Breaking them is 
 1. **`smk/sim/` is pure.** No `pygame` import anywhere under it — not for vectors, not for rects, not for anything. No wall-clock reads. No module-level `random`. `tests/test_sim_purity.py` enforces this.
 2. **Simulation is deterministic.** All randomness goes through the seeded RNG in sim state. Iterate racers by stable ID, never by dict/set order. Same seed + same inputs must produce an identical state hash (`tests/test_determinism.py`).
 3. **Fixed 60 Hz tick, decoupled from render.** The sim never varies with framerate; the renderer interpolates between snapshots.
-4. **Dependency direction is one-way:** `render` → `sim`, `ai` → `sim`, `net` → `sim`. Nothing imports `render`. `sim` imports nothing from the rest of the project.
+4. **Dependency direction is one-way:** `render` → `sim`, `ai` → `sim`, `net` → `sim`. Nothing imports `render`. `sim` imports nothing from the rest of the project except `smk/consts.py`, which must therefore import nothing itself.
 5. **AI uses the same input interface as a human.** AI produces `InputFrame`s. The simulation cannot tell AI from player.
 6. **Content is data, not code.** Monsters, riders, attacks, items, and tracks are JSON (`content/monsters.json`, `content/riders.json`, …). Adding a monster or rider must require zero new attack-resolution code — compose from the six targeting modes in GDD §8.1. If a new attack doesn't fit, add a *mode*, not a special case.
 7. **Loadout is resolved once, at race start.** `resolve_loadout(monster, rider) -> RacerStats` in `smk/sim/loadout.py` is pure and never runs per tick. Temporary modifiers apply on top of the resolved block; they never re-resolve it.
@@ -84,14 +84,14 @@ Riders are **composited over monsters at runtime** using per-monster mount point
 
 ## Current status
 
-**M0 — Mode 7 Spike** (GDD §17) is complete; **M1 — Core Driving** is next. There is no `smk/sim/`, no content, and no fixed-tick loop yet.
+**M0 — Mode 7 Spike** (GDD §17) is complete; **M1 — Core Driving** is in progress, delivered in five slices tracked in the **M1 build plan** under GDD §17 — check it for the current slice and the decisions already taken. There is no content yet.
 
 **What exists:**
 
 - `smk/app/` — entrypoint (`python -m smk`). `bootstrap.setup()` sets Windows per-monitor DPI awareness and must run before `pygame.init()`; `Game` owns the loop (events + blank frame only).
 - `smk/render/screen.py` — `Screen` owns the window and the fixed 320×180 buffer; `Viewport.fit` does integer-scale + letterbox. Scaling happens on the GPU via `pygame._sdl2.video` `Renderer`/`Texture` (nearest-neighbour, vsync on by default) — CPU scaling blew the budget at 1440p+, so don't regress to it.
 - `smk/render/mode7/` — pure-numpy Mode 7 (GDD §14.4): `Mode7Camera` (frozen), `Mode7Plane` (square power-of-two RGB texture with a box-filtered mip chain, packed 10 bits per channel in `uint32`), `RowPlan` (per-row samples and mip levels; cached, depends only on camera height/horizon/FOV), `Mode7Renderer` (writes RGB into `surfarray.pixels3d`, indexed `[x, y, channel]`). Distant rows are averaged over up to 4 depth samples so thin lines don't flicker when driving forward — the one exception to nearest-neighbour (GDD §14.4, §16.1). Rows covering ≤ `sharp_span` texels of depth stay sharp; `sharp_span = math.inf` turns filtering off. Defaults come from `smk/consts.py`. `world_coordinates` is the plain GDD transform kept as the test oracle; `render` uses a faster equivalent.
-- `smk/consts.py` — hand-tunable configuration (display, Mode 7 camera, distance filtering), grouped under comment headers. New knobs go here; implementation facts such as `Mode7Plane`'s colour packing stay next to their code. `smk/sim/` must not import it (rule 4), so sim tuning will need its own home.
+- `smk/consts.py` — the single home for hand-tunable configuration (sim timing, display, main loop, Mode 7 camera, distance filtering), grouped under comment headers. New knobs go here, sim tuning included; implementation facts such as `Mode7Plane`'s colour packing stay next to their code. It is the one project module `smk/sim/` may import, so it must import nothing (rule 4). It mixes shared game rules with per-player preferences; splitting them is GDD §18 #19, for later.
 - `smk/reporting.py` — a global no-op `Reporter` with `measure(name)` / `end_frame()` hooks. Always call through the module (`reporting.reporter.measure(...)`); dev tools install a listening subclass.
 - `tools/` — dev-only, not part of the game: `mode7_spike` (interactive free camera; `M` toggles distance filtering, `[` / `]` move where it starts), `mode7_benchmark` (pass/fail against the M0 budget), `calibration` (generated placeholder texture — a fixture, not a track), `performance` (`PerformanceReporter`).
 
@@ -101,4 +101,4 @@ Riders are **composited over monsters at runtime** using per-monster mount point
 
 The owner's visual check passed: no flicker when driving forward. The softening of distant rows is the intended distance filtering, tunable in `smk/consts.py`, not a scaling fault.
 
-**Next — M1 — Core Driving:** begins by creating `smk/sim/` with `tests/test_sim_purity.py`. Open decision: where sim-side tuning constants (GDD §4.2) live, since `smk/sim/` cannot import `smk/consts.py`.
+**M1 so far:** `smk/sim/` exists — `InputFrame`, the SplitMix64 `Rng`, and `Simulation` (a tick counter until racers land). `smk/app/timestep.py` `FixedTimestep` drives `Game`'s clamped-accumulator 60 Hz loop. `test_sim_purity.py` and `test_determinism.py` guard rules 1 and 2.

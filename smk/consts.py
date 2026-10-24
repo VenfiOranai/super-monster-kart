@@ -2,7 +2,20 @@
 
 Only knobs live here. Constants that are facts of an implementation (such
 as how ``Mode7Plane`` packs colours) stay next to the code that relies on them.
+
+This is the one project module ``smk.sim`` may import, so it must stay pure
+itself: no imports at all (``tests/test_sim_purity.py``). It mixes game rules
+that every peer must share with per-player preferences; splitting the two is
+GDD §18 #19.
 """
+
+# --- Simulation timing (GDD §4.2, §14.3) -----------------------------------
+
+TICK_RATE = 60
+"""Simulation steps per second. A fixed design constant, not a framerate."""
+
+TICK_DURATION = 1 / TICK_RATE
+"""Seconds of game time one ``Simulation.step`` advances."""
 
 # --- Display (GDD §12.1) ---------------------------------------------------
 
@@ -20,6 +33,14 @@ LETTERBOX_COLOUR = (0, 0, 0)
 
 VSYNC = True
 """Lock presentation to the display refresh. Off renders uncapped."""
+
+# --- Main loop (GDD §14.3) -------------------------------------------------
+
+MAX_FRAME_TICKS = 5
+"""Most ticks' worth of time one frame may bank.
+
+A longer hitch drops game time instead of queueing a backlog.
+"""
 
 # --- Mode 7 camera (GDD §12.3) ---------------------------------------------
 

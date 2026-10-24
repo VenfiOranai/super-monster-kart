@@ -11,6 +11,8 @@ Controls
   R / F            raise / lower the camera
   T / G            move the horizon up / down
   Space            toggle auto-orbit (hands-free benchmarking)
+  M                toggle distance filtering, to compare against raw nearest-neighbour
+  [ / ]            filter nearer / further out (rows covering more texels of depth than this are filtered)
   1 2 3 4 5        window 720p / 1080p / 1440p / 4K / awkward 1000x700
   Esc              quit
 
@@ -39,6 +41,7 @@ class Mode7Spike:
     REPORT_INTERVAL = 1.0
     MAX_FRAME_DT = 0.1
     SKY_COLOUR = (96, 144, 216)
+    SHARP_SPAN_STEP = 0.5
 
     MOVE_SPEED = 200.0  # texels per second
     TURN_SPEED = 1.8  # radians per second
@@ -60,8 +63,9 @@ class Mode7Spike:
         reporting.install(self._performance)
         self._screen = Screen(self.TITLE, vsync=vsync)
         self._vsync = vsync
-        texture = pygame.surfarray.map_array(self._screen.buffer, CalibrationTexture.generate())
-        self._renderer = Mode7Renderer(Mode7Plane(texture), Screen.INTERNAL_SIZE)
+        self._renderer = Mode7Renderer(Mode7Plane(CalibrationTexture.generate()), Screen.INTERNAL_SIZE)
+        self._filtered = True
+        self._sharp_span = Mode7Renderer.SHARP_SPAN
         self._camera = Mode7Camera(x=512.0, y=900.0, angle=-math.pi / 2)
         self._horizon = float(self._camera.horizon_y)
         self._orbiting = False
@@ -96,9 +100,20 @@ class Mode7Spike:
                     self._running = False
                 elif event.key == pygame.K_SPACE:
                     self._orbiting = not self._orbiting
+                elif event.key == pygame.K_m:
+                    self._filtered = not self._filtered
+                    self._apply_filtering()
+                elif event.key in (pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET):
+                    step = self.SHARP_SPAN_STEP if event.key == pygame.K_RIGHTBRACKET else -self.SHARP_SPAN_STEP
+                    self._sharp_span = max(0.0, self._sharp_span + step)
+                    self._apply_filtering()
                 elif event.key in self.WINDOW_PRESETS:
                     self._screen.window.size = self.WINDOW_PRESETS[event.key]
                     self._performance.reset()
+
+    def _apply_filtering(self) -> None:
+        self._renderer.sharp_span = self._sharp_span if self._filtered else math.inf
+        self._performance.reset()
 
     def _update_camera(self, dt: float) -> None:
         camera = self._camera
@@ -136,7 +151,7 @@ class Mode7Spike:
         buffer = self._screen.buffer
         with reporting.reporter.measure("mode7"):
             buffer.fill(self.SKY_COLOUR, pygame.Rect(0, 0, buffer.get_width(), self._camera.horizon_y))
-            pixels = pygame.surfarray.pixels2d(buffer)
+            pixels = pygame.surfarray.pixels3d(buffer)
             self._renderer.render(self._camera, pixels)
             del pixels  # unlocks the surface
         self._screen.render()
@@ -154,6 +169,7 @@ class Mode7Spike:
         stages = " | ".join(f"{name} {s.mean_ms:.2f}" for name, s in stats.items() if name != "frame")
         line = (
             f"{'vsync' if self._vsync else 'uncapped'} {window_size[0]}x{window_size[1]} @{scale}x | "
+            f"{f'filtered past {self._sharp_span:g} texels' if self._filtered else 'unfiltered'} | "
             f"{fps:.0f} fps | frame {stats['frame'].mean_ms:.2f} ms | {stages} | "
             f"work p99 {work.p99_ms:.2f} of {self.BUDGET_MS:.2f} {verdict}"
         )

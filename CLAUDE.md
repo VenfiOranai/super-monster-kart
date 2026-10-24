@@ -84,4 +84,18 @@ Riders are **composited over monsters at runtime** using per-monster mount point
 
 ## Current status
 
-Pre-production. The only code so far is an entrypoint (`python -m smk`) that opens a window and presents a blank 320×180 buffer, integer-scaled and letterboxed. There is no sim, fixed-tick loop or vsync yet. Setup: `py -3.12 -m venv .venv` then `.venv/Scripts/python -m pip install -e ".[dev]"`. Next step is **M0 — Mode 7 Spike** (GDD §17): prove Mode 7 rendering at 320×180 holds 144 fps in pygame-ce, verify integer scaling to 1080p/4K, and decide numpy vs moderngl. Nothing else should be built until that exit criterion is met.
+Pre-production, **M0 — Mode 7 Spike** (GDD §17) nearly done on `feature/mode7-spike` (not yet merged to `main`). There is no `smk/sim/`, no content, and no fixed-tick loop yet.
+
+**What exists:**
+
+- `smk/app/` — entrypoint (`python -m smk`). `bootstrap.setup()` sets Windows per-monitor DPI awareness and must run before `pygame.init()`; `Game` owns the loop (events + blank frame only).
+- `smk/render/screen.py` — `Screen` owns the window and the fixed 320×180 buffer; `Viewport.fit` does integer-scale + letterbox. Scaling happens on the GPU via `pygame._sdl2.video` `Renderer`/`Texture` (nearest-neighbour, vsync on by default) — CPU scaling blew the budget at 1440p+, so don't regress to it.
+- `smk/render/mode7/` — pure-numpy Mode 7 (GDD §14.4): `Mode7Camera` (frozen), `Mode7Plane` (square power-of-two RGB texture with a box-filtered mip chain, packed 10 bits per channel in `uint32`), `RowPlan` (per-row samples and mip levels; cached, depends only on camera height/horizon/FOV), `Mode7Renderer` (writes RGB into `surfarray.pixels3d`, indexed `[x, y, channel]`). Distant rows are averaged over up to 4 depth samples so thin lines don't flicker when driving forward — the one exception to nearest-neighbour (GDD §14.4, §16.1). Rows covering ≤ `sharp_span` texels of depth (default 2) stay sharp; `sharp_span = math.inf` turns filtering off. `world_coordinates` is the plain GDD transform kept as the test oracle; `render` uses a faster equivalent.
+- `smk/reporting.py` — a global no-op `Reporter` with `measure(name)` / `end_frame()` hooks. Always call through the module (`reporting.reporter.measure(...)`); dev tools install a listening subclass.
+- `tools/` — dev-only, not part of the game: `mode7_spike` (interactive free camera; `M` toggles distance filtering, `[` / `]` move where it starts), `mode7_benchmark` (pass/fail against the M0 budget), `calibration` (generated placeholder texture — a fixture, not a track), `performance` (`PerformanceReporter`).
+
+**Commands:** setup `py -3.12 -m venv .venv` then `.venv/Scripts/python -m pip install -e ".[dev]"`; tests `.venv/Scripts/python -m pytest` (CI runs them headless on 3.11); benchmark `python -m tools.mode7_benchmark`; spike `python -m tools.mode7_spike [--vsync]`.
+
+**M0 result:** numpy passes — with distance filtering on, whole frame p99 ≈ 2.3–3.1 ms against a 4.17 ms budget (144 fps, 40% spare) at 720p, 1080p, 1440p, 4K and an awkward 1000×700 window (measured 2026-09-26; ≈ 1 ms before filtering was added). moderngl is not needed yet, but the margin is now modest: Mode 7 is ~1.6–1.7 ms of it, so watch it as sprites and HUD land, and moderngl is the fallback if it gets tight.
+
+**Remaining before M0 exit:** the owner's visual check in the spike — blur / non-integer stretch at 1080p and 4K, and distant flicker when driving forward (compare with `M`) — and recording the numpy decision in GDD §18 (Open Question 3). Then merge and start **M1 — Core Driving**, which begins by creating `smk/sim/` with `tests/test_sim_purity.py`.

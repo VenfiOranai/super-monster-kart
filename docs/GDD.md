@@ -934,8 +934,9 @@ Ground-level decals (traps, lingering zones, animated boost pads) are blitted in
 
 ```
 smk/
-  consts.py       # hand-tunable presentation knobs (display, camera, filtering). Not importable by sim.
+  consts.py       # all hand-tunable knobs: sim tuning (§4.2, TICK_RATE) and presentation. Importable by sim, so it imports nothing.
   sim/            # PURE. No pygame, no I/O, no clock.
+    input.py        # InputFrame (§11.1)
     simulation.py   # Simulation, tick order
     loadout.py      # resolve_loadout(monster, rider) -> RacerStats (§7.7)
     racer.py        # driving state + physics (§4)
@@ -950,7 +951,7 @@ smk/
     combat_brain.py # target selection, firing, rider actives (§11.5)
     difficulty.py   # knob presets
   render/         # pygame-ce + numpy. Imports sim, never the reverse.
-    mode7.py        # the affine plane renderer (§14.4)
+    mode7/          # the affine plane renderer (§14.4): camera, plane + mip chain, renderer
     sprites.py      # billboard scaling, rotation frames, rider compositing, draw order
     hud.py          # §12.5
     screen.py       # 320x180 target, integer scaling + letterbox
@@ -979,7 +980,7 @@ tests/
   test_standings.py
 ```
 
-**Dependency direction:** `render` → `sim`, `ai` → `sim`, `net` → `sim`. **Nothing** imports `render`. `sim` imports nothing from the rest of the project.
+**Dependency direction:** `render` → `sim`, `ai` → `sim`, `net` → `sim`. **Nothing** imports `render`. `sim` imports nothing from the rest of the project except `consts.py`, which in turn imports nothing.
 
 ### 14.6 Loadout resolution
 
@@ -1213,6 +1214,25 @@ Each milestone has a goal, deliverables, and an **exit criterion** — something
 
 **Exit:** one monster drives 3 laps of a real track, the game correctly counts them, driving off-road slows you, and hitting a wall bounces you.
 
+#### M1 build plan
+
+Delivered as five slices, one branch each, in order. Each leaves the game runnable and is reviewed before the next starts.
+
+| # | Branch | Delivers | Status |
+|---|---|---|---|
+| 1 | `feature/sim-foundation` | `smk/sim/` package: frozen `InputFrame` (§11.1 fields), seeded `Rng` held in sim state, `Simulation.step()` / `snapshot()` (a tick counter at this stage) and a snapshot state hash; `TICK_RATE` in `consts.py`. `test_sim_purity.py` (walks `smk/sim/` imports; fails on pygame, any project module but `consts`, or wall-clock / module-level-random use; requires `consts.py` to import nothing) and a first `test_determinism.py`. `Game` runs the §14.3 loop: monotonic clock, `frame_dt` clamped to 5 ticks, accumulator, and an interpolation `alpha`. | In progress |
+| 2 | `feature/kart-physics` | `racer.py`: throttle, brake, coast, reverse, speed-dependent turning, hop, drift and `lateral_slip` (§4.1, §4.2, §4.5). `loadout.py` with the monster half of resolution (§4.3); the rider half arrives in M2. Keyboard → `InputFrame` in `app`. A temporary camera pinned to the kart over the calibration texture, so the physics can be felt before the chase camera exists. `test_physics.py`. | — |
+| 3 | `feature/track-loading` | The §10.1 track format and its loader in `smk/content/`, runtime `track.py`, per-tile surface lookup and the §4.4 surface effects, including wall bounce off the crossed tile edge. Builds the test circuit fixture. | — |
+| 4 | `feature/race-progress` | In-order checkpoints, lap counting, and pit / water recovery to the last checkpoint (§10.3, §4.4). | — |
+| 5 | `feature/chase-camera-hud` | Chase camera with lag and yaw smoothing feeding the M0 renderer (§12.3), placeholder kart sprite, minimal HUD: speed, lap, position (§12.5). Decide §18 #6 (is 320×180 tall enough?) from this build. | — |
+
+Decisions taken for M1:
+
+- **One constants file.** Sim tuning (the §4.2 constants, `TICK_RATE`) lives in `smk/consts.py` alongside the presentation knobs. `consts.py` is the single project module the sim may import, and in exchange it must import nothing, so the sim stays pure. Separating shared game rules from per-player preferences is deferred (§18 #19).
+- **The test circuit is a fixture, not a track design.** `test_circuit` is a plain generated oval with a strip of each surface type, built in code like `tools/calibration`. It is not `TRACK_1`; real layouts are owner-authored (§10.5, §18 #7).
+- **The driving monster is a fixture.** `TEST_MONSTER` has every rating at 50, so every §4.3 multiplier is exactly 1.0×. Labelled as a fixture, never a roster entry.
+- **No damage in M1.** Health arrives in M2, so walls and pits bounce and recover but deal nothing; `WALL_DAMAGE` / `PIT_DAMAGE` are left as M2 hooks.
+
 ### M2 — Combat, Health & Loadouts
 
 **Goal:** the core mechanical difference from SMK exists and works, including the two-part racer identity.
@@ -1355,6 +1375,7 @@ Tracked honestly so they don't ossify into unexamined defaults.
 | 16 | **NAT traversal rendezvous hosting** — conflicts with "no dedicated servers"? | M6 | A rendezvous is not a game server, but it is infrastructure. Direct-IP fallback must always work. |
 | 17 | **Point-to-point track count** — one is enough to prove it; is it enough to be interesting? | Post-M4 | Depends on whether `TRACK_4` plays well. |
 | 18 | **Friendly fire / teams** | Post-M7 | Currently no teams at all. Team battle is a natural extension, unscoped — and riders like RIDER_B would gain obvious support-shaped design room. |
+| 19 | **Split `consts.py` into game rules and player config** | M5 | `consts.py` currently mixes values every peer must agree on (tick rate, physics, damage) with per-player preferences (vsync, window size, filtering). Before networking, shared rules must be fixed and identical on host and clients, while preferences become per-player settings. One file is fine until then (decided at M1). |
 
 ---
 
